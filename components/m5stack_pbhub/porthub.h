@@ -1,7 +1,7 @@
 #ifndef __PORTHUB_H__
 #define __PORTHUB_H__
 
-#include <Wire.h>
+#include <Wire>
 
 #define IIC_ADDR1 0x61
 #define IIC_ADDR2 0x62
