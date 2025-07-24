@@ -1,56 +1,135 @@
-#ifndef __PORTHUB_H__
-#define __PORTHUB_H__
+#include "porthub.h"
+#include "esphome/core/log.h"
 
-#include <Wire.h>
+namespace esphome {
+namespace m5stack_pbhub {
 
-#define IIC_ADDR1 0x61
-#define IIC_ADDR2 0x62
-#define IIC_ADDR3 0x63
-#define IIC_ADDR4 0x64
-#define IIC_ADDR5 0x65
-#define IIC_ADDR6 0x66
-#define IIC_ADDR7 0x67
-#define IIC_ADDR8 0x68
-#define HUB1_ADDR 0x40
-#define HUB2_ADDR 0x50
-#define HUB3_ADDR 0x60
-#define HUB4_ADDR 0x70
-#define HUB5_ADDR 0x80
-#define HUB6_ADDR 0xA0
+static const char *const TAG = "m5stack_pbhub.porthub";
 
-class PortHub {
-   public:
-    PortHub();
-    PortHub(uint8_t iic_addr, TwoWire *wire);
-    void begin();
+PortHub::PortHub() {
+    this->set_i2c_address(IIC_ADDR1);
+}
 
-    uint16_t hub_a_read_value(uint8_t reg);
+PortHub::PortHub(uint8_t iic_addr, i2c::I2CBus *i2c_bus) {
+    this->set_i2c_address(iic_addr);
+    this->set_i2c_bus(i2c_bus);
+    this->_iic_addr = iic_addr;
+}
 
-    uint8_t hub_d_read_value_A(uint8_t reg);
-    uint8_t hub_d_read_value_B(uint8_t reg);
+void PortHub::begin() {
+    ESP_LOGD(TAG, "Initializing PortHub at address 0x%02X", this->_iic_addr);
+}
 
-    void hub_d_wire_value_A(uint8_t reg, uint16_t level);
-    void hub_d_wire_value_B(uint8_t reg, uint16_t level);
+uint16_t PortHub::hub_a_read_value(uint8_t reg) {
+    uint16_t value = 0;
+    uint8_t data[2];
+    
+    if (this->read_register(reg, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to read analog value from register 0x%02X", reg);
+        return 0;
+    }
+    
+    value = (data[0] << 8) | data[1];
+    return value;
+}
 
-    void hub_a_wire_value_A(uint8_t reg, uint16_t duty);
-    void hub_a_wire_value_B(uint8_t reg, uint16_t duty);
+uint8_t PortHub::hub_d_read_value_A(uint8_t reg) {
+    uint8_t value = 0;
+    
+    if (this->read_register(reg, &value, 1) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to read digital value A from register 0x%02X", reg);
+        return 0;
+    }
+    
+    return value;
+}
 
-    void hub_wire_length(uint8_t reg, uint16_t length);
+uint8_t PortHub::hub_d_read_value_B(uint8_t reg) {
+    uint8_t value = 0;
+    
+    if (this->read_register(reg + 1, &value, 1) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to read digital value B from register 0x%02X", reg + 1);
+        return 0;
+    }
+    
+    return value;
+}
 
-    void hub_wire_index_color(uint8_t reg, uint16_t num, uint8_t r, int8_t g,
-                              uint8_t b);
+void PortHub::hub_d_wire_value_A(uint8_t reg, uint16_t level) {
+    uint8_t data[2] = {(uint8_t)(level >> 8), (uint8_t)(level & 0xFF)};
+    
+    if (this->write_register(reg, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write digital value A to register 0x%02X", reg);
+    }
+}
 
-    void hub_wire_fill_color(uint8_t reg, uint16_t first, uint16_t count,
-                             uint8_t r, int8_t g, uint8_t b);
+void PortHub::hub_d_wire_value_B(uint8_t reg, uint16_t level) {
+    uint8_t data[2] = {(uint8_t)(level >> 8), (uint8_t)(level & 0xFF)};
+    
+    if (this->write_register(reg + 2, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write digital value B to register 0x%02X", reg + 2);
+    }
+}
 
-    void hub_wire_setBrightness(uint8_t reg, uint8_t brightness);
+void PortHub::hub_a_wire_value_A(uint8_t reg, uint16_t duty) {
+    uint8_t data[2] = {(uint8_t)(duty >> 8), (uint8_t)(duty & 0xFF)};
+    
+    if (this->write_register(reg, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write analog value A to register 0x%02X", reg);
+    }
+}
 
-   public:
-   private:
-    TwoWire *wire;
-    uint8_t _iic_addr = IIC_ADDR1;
+void PortHub::hub_a_wire_value_B(uint8_t reg, uint16_t duty) {
+    uint8_t data[2] = {(uint8_t)(duty >> 8), (uint8_t)(duty & 0xFF)};
+    
+    if (this->write_register(reg + 2, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write analog value B to register 0x%02X", reg + 2);
+    }
+}
 
-   private:
-};
+void PortHub::hub_wire_length(uint8_t reg, uint16_t length) {
+    uint8_t data[2] = {(uint8_t)(length >> 8), (uint8_t)(length & 0xFF)};
+    
+    if (this->write_register(reg, data, 2) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write wire length to register 0x%02X", reg);
+    }
+}
 
-#endif
+void PortHub::hub_wire_index_color(uint8_t reg, uint16_t num, uint8_t r, int8_t g, uint8_t b) {
+    uint8_t data[5] = {
+        (uint8_t)(num >> 8), 
+        (uint8_t)(num & 0xFF), 
+        r, 
+        (uint8_t)g, 
+        b
+    };
+    
+    if (this->write_register(reg, data, 5) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write index color to register 0x%02X", reg);
+    }
+}
+
+void PortHub::hub_wire_fill_color(uint8_t reg, uint16_t first, uint16_t count, uint8_t r, int8_t g, uint8_t b) {
+    uint8_t data[7] = {
+        (uint8_t)(first >> 8), 
+        (uint8_t)(first & 0xFF),
+        (uint8_t)(count >> 8), 
+        (uint8_t)(count & 0xFF),
+        r, 
+        (uint8_t)g, 
+        b
+    };
+    
+    if (this->write_register(reg, data, 7) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write fill color to register 0x%02X", reg);
+    }
+}
+
+void PortHub::hub_wire_setBrightness(uint8_t reg, uint8_t brightness) {
+    if (this->write_register(reg, &brightness, 1) != i2c::ERROR_OK) {
+        ESP_LOGW(TAG, "Failed to write brightness to register 0x%02X", reg);
+    }
+}
+
+}  // namespace m5stack_pbhub
+}  // namespace esphome
